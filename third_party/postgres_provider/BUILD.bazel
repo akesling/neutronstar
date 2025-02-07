@@ -1,0 +1,54 @@
+load("@aspect_bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "postgres_provider",
+    srcs = glob(["src/**/*.rs"], exclude=["src/bin/*"]),
+    data = [],
+    deps = [
+        "@crate_index//:anyhow",
+        "@crate_index//:arrow",
+        "@crate_index//:async-stream",
+        "@crate_index//:bb8",
+        "@crate_index//:bb8-postgres",
+        "@crate_index//:chrono",
+        "@crate_index//:clap",
+        "@crate_index//:datafusion",
+        "@crate_index//:datafusion-postgres",
+        "@crate_index//:datafusion-table-providers",
+        "@crate_index//:futures",
+        "@crate_index//:itertools",
+        "@crate_index//:log",
+        "@crate_index//:object_store",
+        "@crate_index//:pgwire",
+        "@crate_index//:pretty_assertions",
+        "@crate_index//:rand",
+        "@crate_index//:regex",
+        "@crate_index//:secrecy",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
+        "@crate_index//:simplelog",
+        "@crate_index//:snafu",
+        "@crate_index//:thiserror",
+        "@crate_index//:tokio",
+        "@crate_index//:tokio-postgres",
+        "@crate_index//:tokio-util",
+        "@crate_index//:url",
+    ],
+    proc_macro_deps = [
+        "@crate_index//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "postgres_provider_test",
+    crate = ":postgres_provider",
+    deps = [
+        "@crate_index//:pretty_assertions",
+        "@crate_index//:tokio",
+    ],
+)

@@ -1,0 +1,50 @@
+load("@aspect_bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "providers",
+    srcs = glob(["src/**/*.rs"], exclude=["src/bin/*"]),
+    data = [],
+    deps = [
+        "//third_party/postgres_provider",
+    ] + [
+        "@crate_index//:anyhow",
+        "@crate_index//:arrow",
+        "@crate_index//:chrono",
+        "@crate_index//:clap",
+        "@crate_index//:datafusion",
+        "@crate_index//:datafusion-postgres",
+        "@crate_index//:datafusion-table-providers",
+        "@crate_index//:futures",
+        "@crate_index//:itertools",
+        "@crate_index//:log",
+        "@crate_index//:object_store",
+        "@crate_index//:pgwire",
+        "@crate_index//:pretty_assertions",
+        "@crate_index//:rand",
+        "@crate_index//:regex",
+        "@crate_index//:serde",
+        "@crate_index//:serde_json",
+        "@crate_index//:simplelog",
+        "@crate_index//:thiserror",
+        "@crate_index//:tokio",
+        "@crate_index//:tokio-util",
+        "@crate_index//:url",
+    ],
+    proc_macro_deps = [
+        "@crate_index//:async-trait",
+    ],
+)
+
+rust_test(
+    name = "providers_test",
+    crate = ":providers",
+    deps = [
+        "@crate_index//:pretty_assertions",
+        "@crate_index//:tokio",
+    ],
+)
