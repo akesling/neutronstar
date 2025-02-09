@@ -14,6 +14,7 @@ rust_library(
     ] + [
         "@crate_index//:anyhow",
         "@crate_index//:arrow",
+        "@crate_index//:async-stream",
         "@crate_index//:chrono",
         "@crate_index//:clap",
         "@crate_index//:datafusion",
@@ -32,6 +33,7 @@ rust_library(
         "@crate_index//:simplelog",
         "@crate_index//:thiserror",
         "@crate_index//:tokio",
+        "@crate_index//:tokio-stream",
         "@crate_index//:tokio-util",
         "@crate_index//:url",
     ],
