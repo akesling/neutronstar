@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = { workspace = true }
 arrow = { workspace = true }
 async-trait = { workspace = true }
+async-stream = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 datafusion = { workspace = true }
@@ -24,6 +25,7 @@ serde_json = { workspace = true }
 simplelog = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
 

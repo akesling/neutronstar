@@ -55,7 +55,7 @@ pub static HAIKUS: [[&str; 3]; 10] = [
     ],
 ];
 
-/// Print a random CSV-related haiku
+/// Print a random project-related haiku
 pub fn print_haiku(print_all: bool) -> anyhow::Result<()> {
     use rand::seq::SliceRandom as _;
 
