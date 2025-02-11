@@ -4,6 +4,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::SystemTime;
 
 use datafusion::arrow::array::RecordBatch;
+
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaBuilder, SchemaRef, TimeUnit};
 use datafusion::catalog::TableFunctionImpl;
 use datafusion::datasource::TableProvider;
@@ -59,6 +60,7 @@ static LISTING_SCHEMA: LazyLock<SchemaRef> = LazyLock::new(|| {
         DataType::Timestamp(TimeUnit::Second, None),
         true,
     ));
+    builder.push(Field::new("permissions", DataType::Utf8, true));
     builder.push(Field::new("contents", DataType::LargeBinary, true));
 
     Arc::new(builder.finish())
@@ -305,6 +307,14 @@ impl ExecutionPlan for FilesystemExec {
                             }),
                         )))
                     }
+                    "permissions" => columns.push(Arc::new(arrow::array::StringArray::from_iter(
+                        metadatas.iter().map(|meta| {
+                            meta.as_ref().map(|m| {
+                                use std::os::unix::fs::PermissionsExt as _;
+                                symbolic_permissions(m.permissions().mode())
+                            })
+                        }),
+                    ))),
                     "contents" => {
                         columns.push(Arc::new(arrow::array::LargeBinaryArray::from_iter(
                             (0..listing.len()).map(|_| Option::<&[u8]>::None),
@@ -326,4 +336,50 @@ impl ExecutionPlan for FilesystemExec {
             ),
         ))
     }
+}
+
+// TODO(akesling): Actually digest this function wholly wrought from the bowels of ChatGPT and fix
+// what dragons lurk within....
+/// Convert a `u32` (Unix mode bits) into a symbolic "rwxr-xr-x" style string.
+fn symbolic_permissions(mode: u32) -> String {
+    // Extract bits for user/group/other:
+    let ur = if mode & 0o400 != 0 { 'r' } else { '-' };
+    let uw = if mode & 0o200 != 0 { 'w' } else { '-' };
+    let ux = if mode & 0o100 != 0 { 'x' } else { '-' };
+
+    let gr = if mode & 0o040 != 0 { 'r' } else { '-' };
+    let gw = if mode & 0o020 != 0 { 'w' } else { '-' };
+    let gx = if mode & 0o010 != 0 { 'x' } else { '-' };
+
+    let or = if mode & 0o004 != 0 { 'r' } else { '-' };
+    let ow = if mode & 0o002 != 0 { 'w' } else { '-' };
+    let ox = if mode & 0o001 != 0 { 'x' } else { '-' };
+
+    // Handle special bits (setuid, setgid, sticky)
+    let setuid = mode & 0o4000 != 0;
+    let setgid = mode & 0o2000 != 0;
+    let sticky = mode & 0o1000 != 0;
+
+    // Adjust x bits according to setuid, setgid, and sticky bits:
+    let ux = match (ux, setuid) {
+        ('x', true) => 's', // setuid + user-exec
+        ('-', true) => 'S', // setuid without user-exec
+        (c, false) => c,
+        _ => todo!(),
+    };
+    let gx = match (gx, setgid) {
+        ('x', true) => 's', // setgid + group-exec
+        ('-', true) => 'S',
+        (c, false) => c,
+        _ => todo!(),
+    };
+    let ox = match (ox, sticky) {
+        ('x', true) => 't', // sticky + other-exec
+        ('-', true) => 'T',
+        (c, false) => c,
+        _ => todo!(),
+    };
+
+    // Combine into one string
+    format!("{}{}{}{}{}{}{}{}{}", ur, uw, ux, gr, gw, gx, or, ow, ox)
 }
