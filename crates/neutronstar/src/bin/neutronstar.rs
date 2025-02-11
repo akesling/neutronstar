@@ -52,6 +52,13 @@ struct FsExecOptions {
 }
 
 #[derive(clap::Parser, Debug)]
+struct FsTableFuncOptions {
+    /// The query to execute on the virtual table `tbl`
+    #[arg()]
+    query: String,
+}
+
+#[derive(clap::Parser, Debug)]
 struct ExecOptions {
     /// Source CSV files for command
     #[arg(long)]
@@ -87,6 +94,19 @@ async fn fs_exec(context: &GlobalOptions, options: &FsExecOptions) -> anyhow::Re
         },
         &options.path,
         &options.table_name,
+        &options.query,
+    )
+    .await
+}
+
+async fn fs_table_func(
+    context: &GlobalOptions,
+    options: &FsTableFuncOptions,
+) -> anyhow::Result<()> {
+    neutronstar::run_fs_table_func(
+        &neutronstar::CmdOptions {
+            memory_limit_bytes: context.memory_pool_bytes,
+        },
         &options.query,
     )
     .await
@@ -203,6 +223,8 @@ enum Command {
     Exec(ExecOptions),
     /// Execute SQL over a filesystem location
     FsExec(FsExecOptions),
+    /// Execute SQL with a fs() function for filesystem ops
+    FsTableFunc(FsTableFuncOptions),
     /// Serve PostgreSQL wire protocol server over CSV files
     Serve(ServeOptions),
     /// Serve federated NeutronStar nodes
@@ -241,6 +263,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Haiku(options) => haiku(&context, &options).await?,
         Command::Exec(options) => exec(&context, &options).await?,
         Command::FsExec(options) => fs_exec(&context, &options).await?,
+        Command::FsTableFunc(options) => fs_table_func(&context, &options).await?,
         Command::Serve(options) => serve(&context, &options).await?,
         Command::Federate(options) => federate(&context, &options).await?,
     }

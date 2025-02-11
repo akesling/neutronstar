@@ -86,6 +86,14 @@ impl Core {
         Ok(self)
     }
 
+    pub async fn add_fs_table_func(self) -> anyhow::Result<Core> {
+        self.context.register_udtf(
+            "fs",
+            Arc::new(providers::filesystem::FilesystemListingFunction {}),
+        );
+        Ok(self)
+    }
+
     pub async fn execute(&mut self, query: &str) -> anyhow::Result<SendableRecordBatchStream> {
         Ok(self.context.sql(query).await?.execute_stream().await?)
     }
@@ -128,8 +136,6 @@ impl Core {
                     result
                 });
             }
-            #[allow(unreachable_code)]
-            Ok(())
         }))
     }
 

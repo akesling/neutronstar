@@ -142,3 +142,26 @@ pub async fn run_fs(
     println!("Results:\n{}", pretty_results);
     Ok(())
 }
+
+pub async fn run_fs_table_func(options: &CmdOptions, sql: &str) -> anyhow::Result<()> {
+    use futures::stream::StreamExt as _;
+
+    // TODO(alex): Create UDF to print haiku
+    let mut engine = engine::Core::new(options.memory_limit_bytes)?
+        .add_fs_table_func()
+        .await?;
+    let mut stream = engine.execute(sql).await?;
+    let mut batches = Vec::new();
+    while let Some(items) = stream.next().await {
+        batches.push(items?);
+    }
+
+    //while let Some(batch) = stream.next().await {
+    //    let pretty_results = arrow::util::pretty::pretty_format_batches(&[items?])?.to_string();
+    //    println!("Results:\n{}", pretty_results);
+    //}
+
+    let pretty_results = arrow::util::pretty::pretty_format_batches(&batches[..])?.to_string();
+    println!("Results:\n{}", pretty_results);
+    Ok(())
+}

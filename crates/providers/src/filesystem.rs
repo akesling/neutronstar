@@ -21,24 +21,11 @@ pub struct FilesystemListingFunction {}
 
 impl TableFunctionImpl for FilesystemListingFunction {
     fn call(&self, exprs: &[Expr]) -> Result<Arc<dyn TableProvider>, DataFusionError> {
-        todo!("Implement call for FilesystemListingFunction");
-        //    let Some(Expr::Literal(ScalarValue::Int64(Some(value)))) = exprs.get(0) else {
-        //        return datafusion::common::plan_err!("First argument must be an integer");
-        //    };
-        //
-        //    // Create the schema for the table
-        //    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
-        //
-        //// Create a single RecordBatch with the value as a single column
-        //let batch = RecordBatch::try_new(
-        //        schema.clone(),
-        //        vec![Arc::new(Int64Array::from(vec![*value]))],
-        //    )?;
-        //
-        //    // Create a MemTable plan that returns the RecordBatch
-        //    let provider = MemTable::try_new(schema, vec![vec![batch]])?;
-        //
-        //    Ok(Arc::new(provider))
+        let Some(Expr::Literal(ScalarValue::Utf8(Some(path)))) = exprs.first() else {
+            return datafusion::common::plan_err!("First argument must be a filesytem path string");
+        };
+
+        Ok(Arc::new(FilesystemTableProvider::new(path)))
     }
 }
 
