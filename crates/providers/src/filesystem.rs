@@ -45,6 +45,10 @@ impl TableFunctionImpl for FilesystemListingFunction {
 static LISTING_SCHEMA: LazyLock<SchemaRef> = LazyLock::new(|| {
     let mut builder = SchemaBuilder::new();
 
+    // Other things to add?
+    // * Permissions
+    // * owner/group
+
     // From std::fs::DirEntry
     builder.push(Field::new("path", DataType::Utf8, true));
 
@@ -106,7 +110,6 @@ impl TableProvider for FilesystemTableProvider {
         _filters: &[datafusion::logical_expr::Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        println!("Scan projection = {:?}", projection);
         let schema = if let Some(indices) = projection {
             if indices.is_empty() {
                 self.schema.clone()
@@ -264,7 +267,7 @@ impl ExecutionPlan for FilesystemExec {
                     },
                     "is_symlink" => {
                         columns.push(Arc::new(arrow::array::BooleanArray::from_iter(metadatas.iter().map(|meta| {
-                            meta.as_ref().map(|m| m.is_file())
+                            meta.as_ref().map(|m| m.is_symlink())
                         }))))
                     },
                     "size" => {
