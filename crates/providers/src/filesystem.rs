@@ -316,8 +316,22 @@ impl ExecutionPlan for FilesystemExec {
                         }),
                     ))),
                     "contents" => {
-                        columns.push(Arc::new(arrow::array::LargeBinaryArray::from_iter(
-                            (0..listing.len()).map(|_| Option::<&[u8]>::None),
+                        let mut contents: Vec<Vec<u8>> = Vec::with_capacity(listing.len());
+                        for (entry, meta) in listing.iter().zip(metadatas.iter()) {
+                            if let Some(meta) = meta {
+                                if meta.is_dir() {
+                                    contents.push(vec![]);
+                                    continue;
+                                }
+                            } else {
+                                contents.push(vec![]);
+                                continue;
+                            }
+
+                            contents.push(tokio::fs::read(&entry.path()).await.unwrap_or(vec![]))
+                        }
+                        columns.push(Arc::new(arrow::array::LargeBinaryArray::from_vec(
+                            contents.iter().map(Vec::as_slice).collect(),
                         )))
                     }
                     name => Err(DataFusionError::Internal(format!(
