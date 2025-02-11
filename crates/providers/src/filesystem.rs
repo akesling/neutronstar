@@ -225,19 +225,19 @@ impl ExecutionPlan for FilesystemExec {
 
         let root = self.root.clone();
         let schema_ref = self.schema.clone();
-        let s = async_stream::stream! {
-            let listing: Vec<tokio::fs::DirEntry> = tokio_stream::wrappers::ReadDirStream::new(
-                tokio::fs::read_dir(&root).await?)
+        let s = futures::stream::once(async move {
+            let listing: Vec<tokio::fs::DirEntry> =
+                tokio_stream::wrappers::ReadDirStream::new(tokio::fs::read_dir(&root).await?)
                     .collect::<Vec<_>>()
                     .await
                     .into_iter()
                     .collect::<std::io::Result<_>>()
                     .map_err(|error| {
-                        DataFusionError::Internal(
-                            format!(
-                                "Error encountered while listing directory '{}': {}",
-                                root.display(),
-                                error))
+                        DataFusionError::Internal(format!(
+                            "Error encountered while listing directory '{}': {}",
+                            root.display(),
+                            error
+                        ))
                     })?;
             let metadatas = {
                 let mut tmp = Vec::with_capacity(listing.len());
@@ -250,88 +250,88 @@ impl ExecutionPlan for FilesystemExec {
             let mut columns: Vec<Arc<dyn arrow::array::Array>> = vec![];
             for f in &schema_ref.fields {
                 match f.name().as_str() {
-                    "path" => {
-                        columns.push(Arc::new(arrow::array::StringArray::from_iter(listing.iter().map(|entry| {
-                            Some(entry.path().display().to_string())
-                        }))))
-                    },
-                    "is_dir" => {
-                        columns.push(Arc::new(arrow::array::BooleanArray::from_iter(metadatas.iter().map(|meta| {
-                            meta.as_ref().map(|m| m.is_dir())
-                        }))))
-                    },
-                    "is_file" => {
-                        columns.push(Arc::new(arrow::array::BooleanArray::from_iter(metadatas.iter().map(|meta| {
-                            meta.as_ref().map(|m| m.is_file())
-                        }))))
-                    },
-                    "is_symlink" => {
-                        columns.push(Arc::new(arrow::array::BooleanArray::from_iter(metadatas.iter().map(|meta| {
-                            meta.as_ref().map(|m| m.is_symlink())
-                        }))))
-                    },
-                    "size" => {
-                        columns.push(Arc::new(arrow::array::UInt64Array::from_iter(metadatas.iter().map(|meta| {
-                            meta.as_ref().map(|m| m.len())
-                        }))))
-                    },
+                    "path" => columns.push(Arc::new(arrow::array::StringArray::from_iter(
+                        listing
+                            .iter()
+                            .map(|entry| Some(entry.path().display().to_string())),
+                    ))),
+                    "is_dir" => columns.push(Arc::new(arrow::array::BooleanArray::from_iter(
+                        metadatas
+                            .iter()
+                            .map(|meta| meta.as_ref().map(|m| m.is_dir())),
+                    ))),
+                    "is_file" => columns.push(Arc::new(arrow::array::BooleanArray::from_iter(
+                        metadatas
+                            .iter()
+                            .map(|meta| meta.as_ref().map(|m| m.is_file())),
+                    ))),
+                    "is_symlink" => columns.push(Arc::new(arrow::array::BooleanArray::from_iter(
+                        metadatas
+                            .iter()
+                            .map(|meta| meta.as_ref().map(|m| m.is_symlink())),
+                    ))),
+                    "size" => columns.push(Arc::new(arrow::array::UInt64Array::from_iter(
+                        metadatas.iter().map(|meta| meta.as_ref().map(|m| m.len())),
+                    ))),
                     "created" => {
                         columns.push(Arc::new(arrow::array::TimestampSecondArray::from_iter(
                             metadatas.iter().map(|meta| {
                                 meta.as_ref().map(|m| {
-                                    let Ok(time) = m.created() else {
-                                        return 0
-                                    };
-                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH) else {
-                                        return 0
+                                    let Ok(time) = m.created() else { return 0 };
+                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH)
+                                    else {
+                                        return 0;
                                     };
 
                                     dur.as_secs() as i64
                                 })
-                            }))))
-                    },
+                            }),
+                        )))
+                    }
                     "modified" => {
                         columns.push(Arc::new(arrow::array::TimestampSecondArray::from_iter(
                             metadatas.iter().map(|meta| {
                                 meta.as_ref().map(|m| {
-                                    let Ok(time) = m.modified() else {
-                                        return 0
-                                    };
-                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH) else {
-                                        return 0
+                                    let Ok(time) = m.modified() else { return 0 };
+                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH)
+                                    else {
+                                        return 0;
                                     };
 
                                     dur.as_secs() as i64
                                 })
-                            }))))
-                    },
+                            }),
+                        )))
+                    }
                     "accessed" => {
                         columns.push(Arc::new(arrow::array::TimestampSecondArray::from_iter(
                             metadatas.iter().map(|meta| {
                                 meta.as_ref().map(|m| {
-                                    let Ok(time) = m.accessed() else {
-                                        return 0
-                                    };
-                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH) else {
-                                        return 0
+                                    let Ok(time) = m.accessed() else { return 0 };
+                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH)
+                                    else {
+                                        return 0;
                                     };
 
                                     dur.as_secs() as i64
                                 })
-                            }))))
-                    },
+                            }),
+                        )))
+                    }
                     "contents" => {
                         columns.push(Arc::new(arrow::array::LargeBinaryArray::from_iter(
-                            (0..listing.len()).map(|_| Option::<&[u8]>::None)
+                            (0..listing.len()).map(|_| Option::<&[u8]>::None),
                         )))
-                    },
-                    name => Err(DataFusionError::Internal(format!("Unrecognized field {name}")))?
+                    }
+                    name => Err(DataFusionError::Internal(format!(
+                        "Unrecognized field {name}"
+                    )))?,
                 }
             }
 
             let batch = RecordBatch::try_new(schema_ref, columns)?;
-            yield Ok(batch)
-        };
+            Ok(batch)
+        });
         Ok(Box::pin(
             datafusion::physical_plan::stream::RecordBatchStreamAdapter::new(
                 self.schema.clone(),
