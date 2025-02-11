@@ -1,3 +1,5 @@
+use std::path;
+
 use anyhow::{anyhow, bail};
 
 pub mod engine;
@@ -96,6 +98,34 @@ pub async fn run_cmd(
     // TODO(alex): Create UDF to print haiku
     let mut engine = engine::Core::new(options.memory_limit_bytes)?
         .add_direct_table(table_name, sources)
+        .await?;
+    let mut stream = engine.execute(sql).await?;
+    let mut batches = Vec::new();
+    while let Some(items) = stream.next().await {
+        batches.push(items?);
+    }
+
+    //while let Some(batch) = stream.next().await {
+    //    let pretty_results = arrow::util::pretty::pretty_format_batches(&[items?])?.to_string();
+    //    println!("Results:\n{}", pretty_results);
+    //}
+
+    let pretty_results = arrow::util::pretty::pretty_format_batches(&batches[..])?.to_string();
+    println!("Results:\n{}", pretty_results);
+    Ok(())
+}
+
+pub async fn run_fs(
+    options: &CmdOptions,
+    path: &path::Path,
+    table_name: &str,
+    sql: &str,
+) -> anyhow::Result<()> {
+    use futures::stream::StreamExt as _;
+
+    // TODO(alex): Create UDF to print haiku
+    let mut engine = engine::Core::new(options.memory_limit_bytes)?
+        .add_fs_table(table_name, path)
         .await?;
     let mut stream = engine.execute(sql).await?;
     let mut batches = Vec::new();
