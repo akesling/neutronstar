@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path;
 
 use anyhow::{bail, Context as _, Result};
 use clap::Parser;
@@ -34,6 +35,23 @@ async fn haiku(_context: &GlobalOptions, options: &HaikuOptions) -> anyhow::Resu
 }
 
 #[derive(clap::Parser, Debug)]
+struct FsExecOptions {
+    /// Source CSV files for command
+    #[arg(long)]
+    path: path::PathBuf,
+
+    // TODO(alex): Allow arbitrarily binding csv files to tables so we can have multiple tables
+    // surfaced.
+    /// Name for virtual table
+    #[arg(long, default_value = "tbl")]
+    table_name: String,
+
+    /// The query to execute on the virtual table `tbl`
+    #[arg()]
+    query: String,
+}
+
+#[derive(clap::Parser, Debug)]
 struct ExecOptions {
     /// Source CSV files for command
     #[arg(long)]
@@ -56,6 +74,18 @@ async fn exec(context: &GlobalOptions, options: &ExecOptions) -> anyhow::Result<
             memory_limit_bytes: context.memory_pool_bytes,
         },
         &options.csv,
+        &options.table_name,
+        &options.query,
+    )
+    .await
+}
+
+async fn fs_exec(context: &GlobalOptions, options: &FsExecOptions) -> anyhow::Result<()> {
+    neutronstar::run_fs(
+        &neutronstar::CmdOptions {
+            memory_limit_bytes: context.memory_pool_bytes,
+        },
+        &options.path,
         &options.table_name,
         &options.query,
     )
@@ -171,6 +201,8 @@ enum Command {
     Haiku(HaikuOptions),
     /// Execute SQL over CSV files
     Exec(ExecOptions),
+    /// Execute SQL over a filesystem location
+    FsExec(FsExecOptions),
     /// Serve PostgreSQL wire protocol server over CSV files
     Serve(ServeOptions),
     /// Serve federated NeutronStar nodes
@@ -208,6 +240,7 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         Command::Haiku(options) => haiku(&context, &options).await?,
         Command::Exec(options) => exec(&context, &options).await?,
+        Command::FsExec(options) => fs_exec(&context, &options).await?,
         Command::Serve(options) => serve(&context, &options).await?,
         Command::Federate(options) => federate(&context, &options).await?,
     }

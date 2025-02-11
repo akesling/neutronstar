@@ -42,33 +42,33 @@ impl TableFunctionImpl for FilesystemListingFunction {
     }
 }
 
-static listing_schema: LazyLock<SchemaRef> = LazyLock::new(|| {
+static LISTING_SCHEMA: LazyLock<SchemaRef> = LazyLock::new(|| {
     let mut builder = SchemaBuilder::new();
 
     // From std::fs::DirEntry
-    builder.push(Field::new("path", DataType::Utf8, false));
+    builder.push(Field::new("path", DataType::Utf8, true));
 
     // From std::fs::Metadata
-    builder.push(Field::new("is_dir", DataType::Boolean, false));
-    builder.push(Field::new("is_file", DataType::Boolean, false));
-    builder.push(Field::new("is_symlink", DataType::Boolean, false));
-    builder.push(Field::new("size", DataType::UInt64, false));
+    builder.push(Field::new("is_dir", DataType::Boolean, true));
+    builder.push(Field::new("is_file", DataType::Boolean, true));
+    builder.push(Field::new("is_symlink", DataType::Boolean, true));
+    builder.push(Field::new("size", DataType::UInt64, true));
     builder.push(Field::new(
         "created",
-        DataType::Timestamp(TimeUnit::Second, Some("UTC".into())),
+        DataType::Timestamp(TimeUnit::Second, None),
         true,
     ));
     builder.push(Field::new(
         "modified",
-        DataType::Timestamp(TimeUnit::Second, Some("UTC".into())),
+        DataType::Timestamp(TimeUnit::Second, None),
         true,
     ));
     builder.push(Field::new(
         "accessed",
-        DataType::Timestamp(TimeUnit::Second, Some("UTC".into())),
+        DataType::Timestamp(TimeUnit::Second, None),
         true,
     ));
-    builder.push(Field::new("contents", DataType::LargeBinary, false));
+    builder.push(Field::new("contents", DataType::LargeBinary, true));
 
     Arc::new(builder.finish())
 });
@@ -84,7 +84,7 @@ impl FilesystemTableProvider {
     pub fn new(root: impl Into<path::PathBuf>) -> Self {
         Self {
             root: root.into(),
-            schema: listing_schema.clone(),
+            schema: LISTING_SCHEMA.clone(),
         }
     }
 }
@@ -106,40 +106,47 @@ impl TableProvider for FilesystemTableProvider {
         _filters: &[datafusion::logical_expr::Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        return Ok(Arc::new(FilesystemExec::new(&self.root, projection, limit)));
+        println!("Scan projection = {:?}", projection);
+        let schema = if let Some(indices) = projection {
+            if indices.is_empty() {
+                self.schema.clone()
+            } else {
+                Arc::new(self.schema.project(indices)?)
+            }
+        } else {
+            self.schema.clone()
+        };
+
+        return Ok(Arc::new(FilesystemExec::new(&self.root, schema, limit)));
     }
 
     #[doc = "Get the type of this table for metadata/catalog purposes."]
     fn table_type(&self) -> datafusion::logical_expr::TableType {
-        datafusion::logical_expr::TableType::Temporary
+        datafusion::logical_expr::TableType::Base
     }
 }
 
 #[derive(Clone, Debug)]
 struct FilesystemExec {
     root: path::PathBuf,
-    projection: Option<Vec<usize>>,
+    schema: SchemaRef,
     limit: Option<usize>,
     prop_cache: datafusion::physical_plan::PlanProperties,
 }
 
 impl FilesystemExec {
-    pub fn new(
-        root: impl Into<path::PathBuf>,
-        projection: Option<&Vec<usize>>,
-        limit: Option<usize>,
-    ) -> Self {
+    pub fn new(root: impl Into<path::PathBuf>, schema: SchemaRef, limit: Option<usize>) -> Self {
         FilesystemExec {
             root: root.into(),
-            projection: projection.cloned(),
+            schema: schema.clone(),
             limit,
-            prop_cache: Self::compute_properties(1),
+            prop_cache: Self::compute_properties(schema, 1),
         }
     }
 
-    fn compute_properties(n_partitions: usize) -> PlanProperties {
+    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
         PlanProperties::new(
-            EquivalenceProperties::new(listing_schema.clone()),
+            EquivalenceProperties::new(schema),
             datafusion::physical_plan::Partitioning::UnknownPartitioning(n_partitions),
             datafusion::physical_plan::execution_plan::EmissionType::Incremental,
             datafusion::physical_plan::execution_plan::Boundedness::Bounded,
@@ -186,10 +193,14 @@ impl ExecutionPlan for FilesystemExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        Err(DataFusionError::Plan(format!(
-            "FilesystemExec does not support children, attempted to add {}",
-            children.len()
-        )))
+        if children.is_empty() {
+            Ok(self)
+        } else {
+            Err(DataFusionError::Plan(format!(
+                "FilesystemExec does not support children, attempted to add {}",
+                children.len()
+            )))
+        }
     }
 
     fn execute(
@@ -209,14 +220,8 @@ impl ExecutionPlan for FilesystemExec {
             )));
         }
 
-        let schema = if let Some(projection) = &self.projection {
-            Arc::new(listing_schema.project(projection)?)
-        } else {
-            listing_schema.clone()
-        };
-
         let root = self.root.clone();
-        let schema_ref = schema.clone();
+        let schema_ref = self.schema.clone();
         let s = async_stream::stream! {
             let listing: Vec<tokio::fs::DirEntry> = tokio_stream::wrappers::ReadDirStream::new(
                 tokio::fs::read_dir(&root).await?)
@@ -282,6 +287,21 @@ impl ExecutionPlan for FilesystemExec {
                                 })
                             }))))
                     },
+                    "modified" => {
+                        columns.push(Arc::new(arrow::array::TimestampSecondArray::from_iter(
+                            metadatas.iter().map(|meta| {
+                                meta.as_ref().map(|m| {
+                                    let Ok(time) = m.modified() else {
+                                        return 0
+                                    };
+                                    let Ok(dur) = time.duration_since(SystemTime::UNIX_EPOCH) else {
+                                        return 0
+                                    };
+
+                                    dur.as_secs() as i64
+                                })
+                            }))))
+                    },
                     "accessed" => {
                         columns.push(Arc::new(arrow::array::TimestampSecondArray::from_iter(
                             metadatas.iter().map(|meta| {
@@ -299,8 +319,8 @@ impl ExecutionPlan for FilesystemExec {
                     },
                     "contents" => {
                         columns.push(Arc::new(arrow::array::LargeBinaryArray::from_iter(
-                                    (0..listing.len()).map(|_| Option::<&[u8]>::None)
-                            )))
+                            (0..listing.len()).map(|_| Option::<&[u8]>::None)
+                        )))
                     },
                     name => Err(DataFusionError::Internal(format!("Unrecognized field {name}")))?
                 }
@@ -310,7 +330,10 @@ impl ExecutionPlan for FilesystemExec {
             yield Ok(batch)
         };
         Ok(Box::pin(
-            datafusion::physical_plan::stream::RecordBatchStreamAdapter::new(schema, s),
+            datafusion::physical_plan::stream::RecordBatchStreamAdapter::new(
+                self.schema.clone(),
+                s,
+            ),
         ))
     }
 }

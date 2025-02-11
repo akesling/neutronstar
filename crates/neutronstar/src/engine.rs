@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context as _};
@@ -76,6 +77,12 @@ impl Core {
 
         self.context.register_table(name, Arc::new(listing_table))?;
 
+        Ok(self)
+    }
+
+    pub async fn add_fs_table(self, name: &str, path: &path::Path) -> anyhow::Result<Core> {
+        let fs_table = providers::filesystem::FilesystemTableProvider::new(path);
+        self.context.register_table(name, Arc::new(fs_table))?;
         Ok(self)
     }
 
