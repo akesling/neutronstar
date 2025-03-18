@@ -356,6 +356,11 @@ impl ExecutionPlan for FilesystemExec {
 // what dragons lurk within....
 /// Convert a `u32` (Unix mode bits) into a symbolic "rwxr-xr-x" style string.
 fn symbolic_permissions(mode: u32) -> String {
+    // Handle special bits (setuid, setgid, sticky)
+    let setuid = mode & 0o4000 != 0;
+    let setgid = mode & 0o2000 != 0;
+    let sticky = mode & 0o1000 != 0;
+
     // Extract bits for user/group/other:
     let ur = if mode & 0o400 != 0 { 'r' } else { '-' };
     let uw = if mode & 0o200 != 0 { 'w' } else { '-' };
@@ -368,11 +373,6 @@ fn symbolic_permissions(mode: u32) -> String {
     let or = if mode & 0o004 != 0 { 'r' } else { '-' };
     let ow = if mode & 0o002 != 0 { 'w' } else { '-' };
     let ox = if mode & 0o001 != 0 { 'x' } else { '-' };
-
-    // Handle special bits (setuid, setgid, sticky)
-    let setuid = mode & 0o4000 != 0;
-    let setgid = mode & 0o2000 != 0;
-    let sticky = mode & 0o1000 != 0;
 
     // Adjust x bits according to setuid, setgid, and sticky bits:
     let ux = match (ux, setuid) {
