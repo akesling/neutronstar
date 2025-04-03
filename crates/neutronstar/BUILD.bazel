@@ -25,6 +25,7 @@ rust_library(
         "@crate_index//:pretty_assertions",
         "@crate_index//:rand",
         "@crate_index//:regex",
+        "@crate_index//:rmcp",
         "@crate_index//:serde",
         "@crate_index//:serde_json",
         "@crate_index//:simplelog",

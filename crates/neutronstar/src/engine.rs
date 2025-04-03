@@ -30,7 +30,11 @@ impl Core {
         Ok(Core { context })
     }
 
-    pub async fn add_direct_table(self, name: &str, sources: &[String]) -> anyhow::Result<Core> {
+    pub async fn add_direct_csv_table(
+        self,
+        name: &str,
+        sources: &[String],
+    ) -> anyhow::Result<Core> {
         if sources.is_empty() {
             bail!("No table sources provided");
         }

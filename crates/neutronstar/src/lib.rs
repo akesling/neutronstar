@@ -97,7 +97,7 @@ pub async fn run_cmd(
 
     // TODO(alex): Create UDF to print haiku
     let mut engine = engine::Core::new(options.memory_limit_bytes)?
-        .add_direct_table(table_name, sources)
+        .add_direct_csv_table(table_name, sources)
         .await?;
     let mut stream = engine.execute(sql).await?;
     let mut batches = Vec::new();

@@ -135,7 +135,7 @@ async fn serve(context: &GlobalOptions, options: &ServeOptions) -> Result<()> {
     }
 
     let mut engine = neutronstar::engine::Core::new(context.memory_pool_bytes)?
-        .add_direct_table(&options.table_name, &options.csv)
+        .add_direct_csv_table(&options.table_name, &options.csv)
         .await?;
     let join_handle = engine.serve(&options.address).await?;
     join_handle.await?

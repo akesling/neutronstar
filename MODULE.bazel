@@ -3,7 +3,7 @@ module(
     repo_name = "neutronstar",
 )
 
-bazel_dep(name="platforms", version="0.0.10")
+bazel_dep(name="platforms", version="0.0.11")
 
 ################################################################################
 # Utilities ####################################################################
@@ -49,12 +49,12 @@ use_repo(pip, "pip")
 ################################################################################
 
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
-bazel_dep(name = "rules_rust", version = "0.53.0")
+bazel_dep(name = "rules_rust", version = "0.59.2")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
-    versions=["1.82.0"],
+    versions=["1.85.1"],
     extra_target_triples=["x86_64-unknown-linux-musl"],
 )
 use_repo(rust, "rust_toolchains")
@@ -82,6 +82,7 @@ crate_index.spec(package = "pgwire", version = "0.28.0")
 crate_index.spec(package = "pretty_assertions", version = "1.4.1")
 crate_index.spec(package = "rand", version = "0.8.5")
 crate_index.spec(package = "regex", version = "1.5")
+crate_index.spec(package = "rmcp", version = "0.1.5", features = ["server"])
 crate_index.spec(package = "secrecy", version = "0.8.0")
 crate_index.spec(package = "serde", version = "1.0", features = ["derive"])
 crate_index.spec(package = "serde_json", version = "1.0")
@@ -89,8 +90,8 @@ crate_index.spec(package = "simplelog", version = "0.12.0")
 crate_index.spec(package = "snafu", version = "0.8.3")
 crate_index.spec(package = "thiserror", version = "1.0")
 crate_index.spec(package = "tokio",  version = "1.40.0", features = ["full"])
-crate_index.spec(package = "tokio-stream",  version = "0.1", features = ["fs"])
 crate_index.spec(package = "tokio-postgres", version = "0.7.10", features = [ "with-chrono-0_4", "with-uuid-1", "with-serde_json-1", "with-geo-types-0_7"])
+crate_index.spec(package = "tokio-stream",  version = "0.1", features = ["fs"])
 crate_index.spec(package = "tokio-util",  version = "0.7.13", features = ["full"])
 crate_index.spec(package = "url", version = "2.2")
 
