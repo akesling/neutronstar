@@ -113,7 +113,7 @@ async fn fs_table_func(
 }
 
 #[derive(clap::Parser, Debug)]
-struct ServeOptions {
+struct ServePgOptions {
     /// Source CSV files for server
     #[arg(long)]
     csv: Vec<String>,
@@ -129,7 +129,7 @@ struct ServeOptions {
     address: String,
 }
 
-async fn serve(context: &GlobalOptions, options: &ServeOptions) -> Result<()> {
+async fn serve_pg(context: &GlobalOptions, options: &ServePgOptions) -> Result<()> {
     if options.csv.is_empty() {
         bail!("No sources provided when running command")
     }
@@ -139,6 +139,27 @@ async fn serve(context: &GlobalOptions, options: &ServeOptions) -> Result<()> {
         .await?;
     let join_handle = engine.serve(&options.address).await?;
     join_handle.await?
+}
+
+#[derive(clap::Parser, Debug)]
+struct ServeMcpOptions {
+    // TODO(akesling): restrict capabilities?
+    /// Serving address
+    #[arg(default_value = "127.0.0.1:5432")]
+    address: String,
+}
+
+async fn serve_mcp(context: &GlobalOptions, options: &ServeMcpOptions) -> Result<()> {
+    todo!("Implement serve_mcp handler")
+    // if options.csv.is_empty() {
+    //     bail!("No sources provided when running command")
+    // }
+    //
+    // let mut engine = neutronstar::engine::Core::new(context.memory_pool_bytes)?
+    //     .add_direct_csv_table(&options.table_name, &options.csv)
+    //     .await?;
+    // let join_handle = engine.serve(&options.address).await?;
+    // join_handle.await?
 }
 
 #[derive(clap::Parser, Debug)]
@@ -226,7 +247,9 @@ enum Command {
     /// Execute SQL with a fs() function for filesystem ops
     FsTableFunc(FsTableFuncOptions),
     /// Serve PostgreSQL wire protocol server over CSV files
-    Serve(ServeOptions),
+    ServePg(ServePgOptions),
+    /// Serve PostgreSQL wire protocol server over CSV files
+    ServeMcp(ServeMcpOptions),
     /// Serve federated NeutronStar nodes
     Federate(FederateOptions),
 }
@@ -264,7 +287,8 @@ async fn main() -> anyhow::Result<()> {
         Command::Exec(options) => exec(&context, &options).await?,
         Command::FsExec(options) => fs_exec(&context, &options).await?,
         Command::FsTableFunc(options) => fs_table_func(&context, &options).await?,
-        Command::Serve(options) => serve(&context, &options).await?,
+        Command::ServePg(options) => serve_pg(&context, &options).await?,
+        Command::ServeMcp(options) => serve_mcp(&context, &options).await?,
         Command::Federate(options) => federate(&context, &options).await?,
     }
     Ok(())
